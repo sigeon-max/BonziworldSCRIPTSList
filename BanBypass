@@ -1,0 +1,220 @@
+// Paste this entire code into Chrome DevTools Console (F12) on https://bonziworld.kr
+// Fixed: Cannot redefine property autorejoin error
+
+(function() {
+    'use strict';
+
+    // Функция, которая выполняет все перехваты
+    function applyBypass() {
+        console.log('[BonziBypass] Applying bypass logic...');
+
+        // 1. Перехват socket.on('ban')
+        if (typeof Socket !== 'undefined' && Socket.prototype && Socket.prototype.on) {
+            const originalOn = Socket.prototype.on;
+            Socket.prototype.on = function(event, listener) {
+                if (event === 'ban') {
+                    const wrappedListener = function(data) {
+                        console.log('[Bypass] Ban intercepted, data:', data);
+                        document.cookie.split(';').forEach(function(c) {
+                            document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+                        });
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        
+                        if (typeof autorejoin !== 'undefined') {
+                            autorejoin = true;
+                        }
+                        
+                        const pageBan = document.getElementById('page_ban');
+                        if (pageBan) pageBan.hidden = true;
+                        const pageKick = document.getElementById('page_kick');
+                        if (pageKick) pageKick.hidden = true;
+                        
+                        if (window.socket && window.socket.disconnect) {
+                            window.socket.disconnect();
+                        }
+                        if (window.socket && window.socket.io && window.socket.io.opts) {
+                            window.socket.io.opts.query = {
+                                device: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                    const r = Math.random() * 16 | 0;
+                                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                                    return v.toString(16);
+                                }),
+                                ts: Date.now()
+                            };
+                        }
+                        if (window.socket && window.socket.connect) {
+                            window.socket.connect();
+                        }
+                        
+                        const banSound = new Audio('sfx/ban.ogg');
+                        banSound.play = function() { return Promise.resolve(); };
+                        
+                        let url = window.location.href;
+                        if (url.indexOf('?') === -1) {
+                            url += '?reconnect=' + Date.now();
+                        } else {
+                            url += '&reconnect=' + Date.now();
+                        }
+                        window.location.href = url;
+                    };
+                    return originalOn.call(this, event, wrappedListener);
+                }
+                return originalOn.call(this, event, listener);
+            };
+        }
+
+        // 2. Перехват io.connect
+        if (typeof io !== 'undefined' && io.connect) {
+            const originalConnect = io.connect;
+            io.connect = function(url, opts) {
+                if (url && url.includes('bonziworld.kr')) {
+                    if (!opts) opts = {};
+                    if (!opts.query) opts.query = {};
+                    opts.query.device = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                    opts.query.ts = Date.now();
+                    delete opts.query.token;
+                    delete opts.query.session;
+                }
+                return originalConnect.call(this, url, opts);
+            };
+        }
+
+        // 3. Периодическая проверка бан-страницы
+        if (!window._banIntervalSet) {
+            window._banIntervalSet = true;
+            setInterval(function() {
+                const pageBan = document.getElementById('page_ban');
+                if (pageBan && !pageBan.hidden) {
+                    console.log('[Bypass] Ban page detected, hiding');
+                    pageBan.hidden = true;
+                    document.cookie.split(';').forEach(function(c) {
+                        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+                    });
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    if (typeof autorejoin !== 'undefined') {
+                        autorejoin = true;
+                    }
+                    if (window.socket && window.socket.disconnect) {
+                        window.socket.disconnect();
+                    }
+                    if (window.socket && window.socket.connect) {
+                        window.socket.connect();
+                    }
+                    let url = window.location.href;
+                    if (url.indexOf('?') === -1) {
+                        url += '?refresh=' + Date.now();
+                    } else {
+                        url += '&refresh=' + Date.now();
+                    }
+                    window.location.href = url;
+                }
+                const pageKick = document.getElementById('page_kick');
+                if (pageKick && !pageKick.hidden) {
+                    pageKick.hidden = true;
+                }
+            }, 3000);
+        }
+
+        // 4. Подавление звука ban.ogg
+        const originalAudio = window.Audio;
+        window.Audio = function(src) {
+            if (src && src.includes('ban.ogg')) {
+                const fakeAudio = new originalAudio();
+                fakeAudio.play = function() { return Promise.resolve(); };
+                fakeAudio.pause = function() { return; };
+                fakeAudio.volume = 0;
+                return fakeAudio;
+            }
+            return new originalAudio(src);
+        };
+
+        // 5. Подмена autorejoin - с проверкой на существование
+        if (typeof autorejoin !== 'undefined') {
+            try {
+                Object.defineProperty(window, 'autorejoin', {
+                    get: function() { return true; },
+                    set: function() { return; },
+                    configurable: true
+                });
+            } catch(e) {
+                // Если переопределить нельзя, просто присваиваем
+                console.log('[Bypass] Cannot redefine autorejoin, using direct assignment');
+                window.autorejoin = true;
+            }
+        } else {
+            // Если переменная не существует, создаем её
+            window.autorejoin = true;
+        }
+
+        // 6. Скрытие бан/кик страниц
+        const pageBan = document.getElementById('page_ban');
+        if (pageBan) pageBan.hidden = true;
+        const pageKick = document.getElementById('page_kick');
+        if (pageKick) pageKick.hidden = true;
+        document.cookie.split(';').forEach(function(c) {
+            if (c.includes('session') || c.includes('token') || c.includes('ban')) {
+                document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+            }
+        });
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // 7. Перехват socket.emit
+        if (window.socket && window.socket.emit) {
+            const originalEmit = window.socket.emit;
+            window.socket.emit = function(event, ...args) {
+                if (event === 'auth' || event === 'login' || event === 'connect') {
+                    if (args.length > 0 && typeof args[0] === 'object') {
+                        args[0].device = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            const r = Math.random() * 16 | 0;
+                            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                        delete args[0].token;
+                        delete args[0].session;
+                    }
+                }
+                return originalEmit.call(this, event, ...args);
+            };
+        }
+
+        // 8. Дополнительный перехват для io.Socket
+        if (typeof io !== 'undefined' && typeof io.Socket !== 'undefined') {
+            const SocketIO = io.Socket;
+            if (SocketIO && SocketIO.prototype && SocketIO.prototype.on) {
+                const originalSocketOn = SocketIO.prototype.on;
+                SocketIO.prototype.on = function(event, listener) {
+                    if (event === 'ban') {
+                        const wrappedListener = function(data) {
+                            console.log('[Bypass] io.Socket ban intercepted');
+                            return;
+                        };
+                        return originalSocketOn.call(this, event, wrappedListener);
+                    }
+                    return originalSocketOn.call(this, event, listener);
+                };
+            }
+        }
+
+        console.log('[BonziBypass] Active - all ban mechanisms intercepted');
+    }
+
+    // Проверка readyState и выполнение
+    if (document.readyState === 'loading') {
+        console.log('[BonziBypass] Document loading, waiting for DOMContentLoaded...');
+        document.addEventListener('DOMContentLoaded', applyBypass, { once: true });
+    } else {
+        // DOM уже загружен, выполняем немедленно
+        applyBypass();
+    }
+
+    // Дополнительно: повторное применение через 2 секунды для страховки
+    setTimeout(applyBypass, 2000);
+
+})();
