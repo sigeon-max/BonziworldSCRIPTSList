@@ -1,0 +1,705 @@
+// ============================================================
+// EF2 Tornado System for BonziWORLD.kr
+// ============================================================
+// Визуально точный к изображению: классическая воронка от
+// стены облаков, мусор у основания, дождь, молнии, тёмное
+// штормовое небо. Бонзи захватываются и вращаются.
+// ============================================================
+
+(function() {
+    'use strict';
+
+    // --- Конфигурация ---
+    const CONFIG = {
+        TORNADO_RADIUS: 180,
+        TORNADO_HEIGHT: 0, // вычисляется динамически
+        ROTATION_SPEED: 0.06,
+        LIFT_FORCE: 0.6,
+        WIND_SPEED_MPH: 125,
+        DEBRIS_COUNT: 50,
+        RAIN_COUNT: 300,
+        RESPAWN_DELAY: 3000,
+        LIGHTNING_INTERVAL: [4000, 12000], // мс, случайный интервал
+        CLOUD_LAYERS: 5,
+    };
+
+    // --- DOM ---
+    const bonzis = document.querySelectorAll('.bonzi');
+    const container = document.getElementById('content') || document.body;
+
+    if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+    }
+    container.style.overflow = 'hidden';
+
+    // --- Создание Canvas для фона (небо, облака, дождь, молнии) ---
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:900;pointer-events:none;';
+    container.appendChild(bgCanvas);
+    const bgCtx = bgCanvas.getContext('2d');
+
+    // --- Создание Canvas для торнадо (воронка + мусор) ---
+    const tnCanvas = document.createElement('canvas');
+    tnCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:998;pointer-events:none;';
+    container.appendChild(tnCanvas);
+    const tnCtx = tnCanvas.getContext('2d');
+
+    function resizeCanvases() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        bgCanvas.width = w; bgCanvas.height = h;
+        tnCanvas.width = w; tnCanvas.height = h;
+        CONFIG.TORNADO_HEIGHT = h * 0.75;
+    }
+    resizeCanvases();
+    window.addEventListener('resize', resizeCanvases);
+
+    // --- Состояние ---
+    const state = {
+        active: true,
+        tornadoCenter: { x: 0, y: 0 },
+        angle: 0,
+        time: 0,
+        debris: [],
+        bonziData: [],
+        rain: [],
+        clouds: [],
+        lightning: { active: false, alpha: 0, bolts: [], nextTime: 0 },
+        groundTrees: [],
+    };
+
+    // --- Инициализация Bonzi ---
+    bonzis.forEach((b, idx) => {
+        const rect = b.getBoundingClientRect();
+        const cRect = container.getBoundingClientRect();
+        state.bonziData.push({
+            element: b,
+            origX: rect.left - cRect.left + rect.width / 2,
+            origY: rect.top - cRect.top + rect.height / 2,
+            isCaught: false,
+            angleOffset: Math.random() * Math.PI * 2,
+            radiusOffset: 0.3 + Math.random() * 0.7,
+            liftOffset: Math.random() * 100,
+            origDisplay: b.style.display || '',
+            origOpacity: b.style.opacity || '1',
+        });
+        b.style.transition = 'none';
+        b.style.position = 'absolute';
+        b.style.willChange = 'transform, opacity';
+    });
+
+    // --- Генерация облаков ---
+    function initClouds() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        state.clouds = [];
+        for (let i = 0; i < CONFIG.CLOUD_LAYERS; i++) {
+            const layer = [];
+            const count = 8 + Math.floor(Math.random() * 6);
+            for (let j = 0; j < count; j++) {
+                layer.push({
+                    x: Math.random() * w * 1.4 - w * 0.2,
+                    y: Math.random() * h * 0.25 - 20,
+                    w: 150 + Math.random() * 350,
+                    h: 40 + Math.random() * 80,
+                    speed: 0.15 + Math.random() * 0.4,
+                    darkness: 0.6 + Math.random() * 0.35,
+                });
+            }
+            state.clouds.push(layer);
+        }
+    }
+    initClouds();
+
+    // --- Генерация деревьев (упрощённых силуэтов) ---
+    function initTrees() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        state.groundTrees = [];
+        const groundY = h * 0.88;
+        const treeCount = 18 + Math.floor(Math.random() * 12);
+        for (let i = 0; i < treeCount; i++) {
+            const tx = Math.random() * w;
+            // Не сажаем прямо под торнадо
+            const dx = Math.abs(tx - w / 2);
+            if (dx < 80) continue;
+            state.groundTrees.push({
+                x: tx,
+                y: groundY + Math.random() * 20,
+                height: 25 + Math.random() * 55,
+                width: 12 + Math.random() * 20,
+                lean: (Math.random() - 0.5) * 0.3, // наклон от ветра
+                shade: 0.15 + Math.random() * 0.15,
+            });
+        }
+    }
+    initTrees();
+    window.addEventListener('resize', () => { initClouds(); initTrees(); });
+
+    // --- Генерация дождя ---
+    function initRain() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        state.rain = [];
+        for (let i = 0; i < CONFIG.RAIN_COUNT; i++) {
+            state.rain.push({
+                x: Math.random() * w * 1.3 - w * 0.15,
+                y: Math.random() * h,
+                length: 12 + Math.random() * 25,
+                speed: 14 + Math.random() * 10,
+                windOffset: 3 + Math.random() * 4,
+                alpha: 0.08 + Math.random() * 0.18,
+                width: 0.5 + Math.random() * 1.2,
+            });
+        }
+    }
+    initRain();
+    window.addEventListener('resize', initRain);
+
+    // --- Генерация молний ---
+    function generateBolt(x1, y1, x2, y2, depth) {
+        if (depth <= 0) return [{ x1, y1, x2, y2 }];
+        const mx = (x1 + x2) / 2 + (Math.random() - 0.5) * 80 / depth;
+        const my = (y1 + y2) / 2 + (Math.random() - 0.5) * 20;
+        let segs = [
+            ...generateBolt(x1, y1, mx, my, depth - 1),
+            ...generateBolt(mx, my, x2, y2, depth - 1),
+        ];
+        // Ветвление
+        if (depth > 1 && Math.random() < 0.35) {
+            const bx = mx + (Math.random() - 0.5) * 120;
+            const by = my + 30 + Math.random() * 80;
+            segs.push(...generateBolt(mx, my, bx, by, depth - 2));
+        }
+        return segs;
+    }
+
+    function triggerLightning() {
+        const w = bgCanvas.width;
+        const h = bgCanvas.height;
+        const cx = w / 2 + (Math.random() - 0.5) * w * 0.6;
+        const bolts = [];
+        const mainBolt = generateBolt(cx, 0, cx + (Math.random() - 0.5) * 100, h * 0.6, 5);
+        bolts.push(...mainBolt);
+        // Иногда вторая молния
+        if (Math.random() < 0.4) {
+            const cx2 = cx + (Math.random() - 0.5) * 300;
+            bolts.push(...generateBolt(cx2, 0, cx2 + (Math.random() - 0.5) * 80, h * 0.5, 4));
+        }
+        state.lightning = { active: true, alpha: 1.0, bolts, fadeSpeed: 0.03 + Math.random() * 0.04 };
+        state.lightning.nextTime = performance.now() + CONFIG.LIGHTNING_INTERVAL[0] + Math.random() * (CONFIG.LIGHTNING_INTERVAL[1] - CONFIG.LIGHTNING_INTERVAL[0]);
+    }
+
+    // --- Создание частиц мусора ---
+    function createDebris() {
+        const colors = ['#5C4033', '#8B7355', '#A0522D', '#CD853F', '#696969', '#4A4A4A', '#3E2723', '#2C2C2C'];
+        for (let i = 0; i < CONFIG.DEBRIS_COUNT; i++) {
+            const size = 4 + Math.random() * 12;
+            const isRect = Math.random() > 0.4;
+            state.debris.push({
+                size,
+                isRect,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                orbitRadius: 15 + Math.random() * CONFIG.TORNADO_RADIUS * 0.7,
+                orbitSpeed: 0.03 + Math.random() * 0.06,
+                orbitAngle: Math.random() * Math.PI * 2,
+                verticalPhase: Math.random() * Math.PI * 2,
+                verticalSpeed: 0.5 + Math.random() * 1.5,
+                verticalAmp: 20 + Math.random() * 60,
+                rotSpeed: (Math.random() - 0.5) * 0.15,
+                rot: Math.random() * Math.PI * 2,
+                alpha: 0.4 + Math.random() * 0.5,
+                baseY: 0.7 + Math.random() * 0.25, // 0.7-0.95 от высоты воронки (нижняя часть)
+            });
+        }
+    }
+    createDebris();
+
+    // --- Вспомогательные ---
+    function getCenter() {
+        return { x: tnCanvas.width / 2, y: tnCanvas.height / 2 };
+    }
+
+    // --- Рисуем штормовое небо ---
+    function drawSky(ctx, w, h) {
+        // Градиент от почти чёрного сверху к тёмно-серому снизу
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, '#0a0a0f');
+        grad.addColorStop(0.2, '#111118');
+        grad.addColorStop(0.45, '#1a1a24');
+        grad.addColorStop(0.7, '#222230');
+        grad.addColorStop(0.85, '#2a2a36');
+        grad.addColorStop(1, '#1e1e28');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        // Зелёноватый оттенок (характерен для торнадо — свет от града/зелёного неба)
+        const greenGrad = ctx.createRadialGradient(w * 0.5, h * 0.3, 0, w * 0.5, h * 0.3, w * 0.6);
+        greenGrad.addColorStop(0, 'rgba(40, 60, 30, 0.15)');
+        greenGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = greenGrad;
+        ctx.fillRect(0, 0, w, h);
+    }
+
+    // --- Рисуем облака ---
+    function drawClouds(ctx, w, h, t) {
+        state.clouds.forEach((layer, li) => {
+            layer.forEach(c => {
+                c.x += c.speed * (1 + li * 0.3);
+                if (c.x > w + 200) c.x = -c.w - 50;
+
+                const darkness = c.darkness;
+                const r = Math.floor(30 * darkness);
+                const g = Math.floor(30 * darkness);
+                const b = Math.floor(38 * darkness);
+
+                ctx.save();
+                ctx.globalAlpha = 0.7 + darkness * 0.3;
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.beginPath();
+                // Мягкие эллипсы
+                ctx.ellipse(c.x, c.y, c.w / 2, c.h / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Дополнительный объём
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = `rgb(${r + 15},${g + 15},${b + 18})`;
+                ctx.beginPath();
+                ctx.ellipse(c.x - c.w * 0.15, c.y - c.h * 0.2, c.w * 0.35, c.h * 0.35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        });
+
+        // Стена облака (wall cloud) — тёмное вращающееся образование над торнадо
+        const cx = w / 2;
+        const wallY = h * 0.12;
+        const wallGrad = ctx.createRadialGradient(cx, wallY, 20, cx, wallY, 220);
+        wallGrad.addColorStop(0, 'rgba(15, 15, 20, 0.95)');
+        wallGrad.addColorStop(0.4, 'rgba(25, 25, 35, 0.8)');
+        wallGrad.addColorStop(0.7, 'rgba(35, 35, 48, 0.5)');
+        wallGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = wallGrad;
+        ctx.fillRect(cx - 250, wallY - 150, 500, 300);
+
+        // Вращающиеся фрагменты стены облака
+        for (let i = 0; i < 6; i++) {
+            const a = t * 0.0003 + i * Math.PI / 3;
+            const r = 60 + Math.sin(t * 0.001 + i) * 30;
+            const fx = cx + Math.cos(a) * r;
+            const fy = wallY + Math.sin(a) * r * 0.4;
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#14141c';
+            ctx.beginPath();
+            ctx.ellipse(fx, fy, 50 + Math.sin(i) * 20, 25 + Math.cos(i) * 10, a * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    // --- Рисуем землю ---
+    function drawGround(ctx, w, h) {
+        const groundY = h * 0.88;
+
+        // Водоём вдалеке (на горизонте)
+        const waterGrad = ctx.createLinearGradient(0, groundY - 40, 0, groundY + 10);
+        waterGrad.addColorStop(0, '#1a2030');
+        waterGrad.addColorStop(0.5, '#1e2838');
+        waterGrad.addColorStop(1, '#222832');
+        ctx.fillStyle = waterGrad;
+        ctx.fillRect(0, groundY - 40, w, 50);
+
+        // Блики на воде от молнии
+        if (state.lightning.active && state.lightning.alpha > 0.3) {
+            ctx.save();
+            ctx.globalAlpha = state.lightning.alpha * 0.15;
+            ctx.fillStyle = '#8899bb';
+            ctx.fillRect(0, groundY - 35, w, 40);
+            ctx.restore();
+        }
+
+        // Земля
+        const gndGrad = ctx.createLinearGradient(0, groundY, 0, h);
+        gndGrad.addColorStop(0, '#1a1e14');
+        gndGrad.addColorStop(0.3, '#1c2016');
+        gndGrad.addColorStop(1, '#121510');
+        ctx.fillStyle = gndGrad;
+        ctx.fillRect(0, groundY + 5, w, h - groundY);
+
+        // Деревья (силуэты, наклонённые ветром)
+        state.groundTrees.forEach(tree => {
+            ctx.save();
+            ctx.translate(tree.x, tree.y);
+            ctx.rotate(tree.lean + Math.sin(state.time * 0.002) * 0.05); // покачивание
+
+            // Ствол
+            ctx.fillStyle = `rgba(10, 12, 8, ${0.7 + tree.shade})`;
+            ctx.fillRect(-2, -tree.height, 4, tree.height);
+
+            // Крона
+            ctx.fillStyle = `rgba(15, 20, 10, ${0.6 + tree.shade})`;
+            ctx.beginPath();
+            ctx.ellipse(0, -tree.height, tree.width / 2, tree.height * 0.45, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        });
+
+        // Пыльное облако у основания торнадо
+        const cx = w / 2;
+        const dustY = groundY;
+        for (let i = 0; i < 8; i++) {
+            const dx = Math.sin(state.time * 0.001 + i * 0.8) * 60;
+            const dy = Math.cos(state.time * 0.0015 + i) * 15;
+            const dustR = 40 + Math.sin(i * 2.3) * 20;
+            const dustGrad = ctx.createRadialGradient(cx + dx, dustY + dy, 0, cx + dx, dustY + dy, dustR);
+            dustGrad.addColorStop(0, 'rgba(80, 70, 55, 0.25)');
+            dustGrad.addColorStop(0.6, 'rgba(60, 55, 40, 0.12)');
+            dustGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = dustGrad;
+            ctx.beginPath();
+            ctx.arc(cx + dx, dustY + dy, dustR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // --- Рисуем дождь ---
+    function drawRain(ctx, w, h) {
+        ctx.save();
+        state.rain.forEach(r => {
+            r.x += r.windOffset;
+            r.y += r.speed;
+
+            if (r.y > h) { r.y = -r.length; r.x = Math.random() * w * 1.3 - w * 0.15; }
+            if (r.x > w * 1.15) r.x = -20;
+
+            ctx.strokeStyle = `rgba(160, 170, 190, ${r.alpha})`;
+            ctx.lineWidth = r.width;
+            ctx.beginPath();
+            ctx.moveTo(r.x, r.y);
+            ctx.lineTo(r.x + r.windOffset * 0.7, r.y + r.length);
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    // --- Рисуем молнию ---
+    function drawLightning(ctx, w, h, now) {
+        if (!state.lightning.active) {
+            if (now > state.lightning.nextTime) {
+                triggerLightning();
+            }
+            return;
+        }
+
+        const l = state.lightning;
+        l.alpha -= l.fadeSpeed;
+        if (l.alpha <= 0) {
+            l.active = false;
+            return;
+        }
+
+        // Вспышка неба
+        ctx.save();
+        ctx.globalAlpha = l.alpha * 0.08;
+        ctx.fillStyle = '#aabbdd';
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+
+        // Молнии
+        ctx.save();
+        l.bolts.forEach(seg => {
+            // Свечение
+            ctx.strokeStyle = `rgba(180, 190, 255, ${l.alpha * 0.3})`;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(seg.x1, seg.y1);
+            ctx.lineTo(seg.x2, seg.y2);
+            ctx.stroke();
+
+            // Ядро
+            ctx.strokeStyle = `rgba(230, 235, 255, ${l.alpha * 0.9})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(seg.x1, seg.y1);
+            ctx.lineTo(seg.x2, seg.y2);
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    // --- Рисуем воронку торнадо ---
+    function drawTornadoFunnel(ctx, w, h, t) {
+        const cx = w / 2;
+        const topY = h * 0.15;        // верх воронки (стена облака)
+        const bottomY = h * 0.87;     // низ (земля)
+        const topRadius = 130;         // широкий верх
+        const bottomRadius = 18;       // узкий низ
+        const steps = 60;
+
+        // Многослойная воронка для объёма
+        const layers = [
+            { offset: 0, alpha: 0.12, color: '60,55,50' },
+            { offset: -8, alpha: 0.15, color: '50,45,40' },
+            { offset: 8, alpha: 0.15, color: '50,45,40' },
+            { offset: 0, alpha: 0.2, color: '40,38,35' },
+            { offset: -4, alpha: 0.25, color: '35,32,30' },
+            { offset: 4, alpha: 0.25, color: '35,32,30' },
+            { offset: 0, alpha: 0.5, color: '28,26,24' },  // ядро
+        ];
+
+        layers.forEach(layer => {
+            ctx.save();
+            ctx.globalAlpha = layer.alpha;
+
+            // Левая и правая стороны воронки
+            for (let side = -1; side <= 1; side += 2) {
+                ctx.beginPath();
+                for (let i = 0; i <= steps; i++) {
+                    const frac = i / steps;
+                    const y = topY + (bottomY - topY) * frac;
+
+                    // Радиус сужается сверху вниз, с волнистостью
+                    const baseR = topRadius + (bottomRadius - topRadius) * frac;
+                    const wave = Math.sin(frac * Math.PI * 6 + t * 0.003 + layer.offset * 0.1) * (8 + frac * 12);
+                    const wobble = Math.sin(frac * Math.PI * 3 + t * 0.002) * 5;
+                    const r = Math.max(5, baseR + wave + wobble);
+
+                    const x = cx + side * r + layer.offset + Math.sin(t * 0.001 + frac * 4) * 3;
+
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+
+                // Замыкаем фигуру через центр
+                ctx.lineTo(cx + layer.offset, bottomY);
+                ctx.lineTo(cx + layer.offset, topY);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(${layer.color}, 1)`;
+                ctx.fill();
+            }
+            ctx.restore();
+        });
+
+        // Вращающиеся полосы на воронке (детали текстуры)
+        ctx.save();
+        for (let i = 0; i < 12; i++) {
+            const frac = 0.05 + (i / 12) * 0.9;
+            const y = topY + (bottomY - topY) * frac;
+            const baseR = topRadius + (bottomRadius - topRadius) * frac;
+            const wave = Math.sin(frac * Math.PI * 6 + t * 0.003) * (8 + frac * 12);
+            const r = Math.max(5, baseR + wave);
+
+            const spiralAngle = t * 0.004 + i * 0.5;
+            const sx = cx + Math.cos(spiralAngle) * r * 0.3;
+            const sy = y + Math.sin(spiralAngle) * 5;
+
+            ctx.globalAlpha = 0.06 + frac * 0.08;
+            ctx.strokeStyle = '#4a4540';
+            ctx.lineWidth = 2 + frac * 3;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, r * 0.6, 4, spiralAngle * 0.2, 0, Math.PI * 1.5);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Яркое ядро (тонкая светлая линия в центре — подсветка)
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        const coreGrad = ctx.createLinearGradient(cx, topY, cx, bottomY);
+        coreGrad.addColorStop(0, 'rgba(120,115,110,0)');
+        coreGrad.addColorStop(0.3, 'rgba(120,115,110,0.5)');
+        coreGrad.addColorStop(0.7, 'rgba(100,95,90,0.3)');
+        coreGrad.addColorStop(1, 'rgba(80,75,70,0)');
+        ctx.strokeStyle = coreGrad;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx, topY);
+        ctx.lineTo(cx, bottomY);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // --- Рисуем мусор внутри воронки ---
+    function drawDebris(ctx, w, h, t) {
+        const cx = w / 2;
+        const topY = h * 0.15;
+        const bottomY = h * 0.87;
+
+        state.debris.forEach(d => {
+            d.orbitAngle += d.orbitSpeed;
+            d.rot += d.rotSpeed;
+
+            // Вертикальная позиция колеблется
+            const yFrac = d.baseY + Math.sin(t * 0.001 * d.verticalSpeed + d.verticalPhase) * 0.08;
+            const y = topY + (bottomY - topY) * Math.max(0, Math.min(1, yFrac));
+
+            // Радиус воронки на этой высоте
+            const topR = 130;
+            const bottomR = 18;
+            const localR = topR + (bottomR - topR) * Math.max(0, Math.min(1, yFrac));
+
+            // Орбита
+            const orbitR = localR * (0.3 + d.orbitRadius / (CONFIG.TORNADO_RADIUS * 0.7) * 0.7);
+            const x = cx + Math.cos(d.orbitAngle) * orbitR;
+            const drawY = y + Math.sin(d.orbitAngle * 2 + d.verticalPhase) * 5;
+
+            // Размер зависит от высоты (перспектива)
+            const scale = 0.5 + yFrac * 0.5;
+
+            ctx.save();
+            ctx.translate(x, drawY);
+            ctx.rotate(d.rot);
+            ctx.globalAlpha = d.alpha * (0.5 + yFrac * 0.5);
+
+            const s = d.size * scale;
+            ctx.fillStyle = d.color;
+            if (d.isRect) {
+                ctx.fillRect(-s * 0.35, -s * 0.7, s * 0.7, s * 1.4);
+            } else {
+                ctx.beginPath();
+                ctx.arc(0, 0, s / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        });
+    }
+
+    // --- Затемнение по краям (виньетка) ---
+    function drawVignette(ctx, w, h) {
+        const grad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.75);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(0.6, 'rgba(0,0,0,0.15)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+    }
+
+    // --- Обновление Bonzi ---
+    function updateBonzis(now) {
+        const center = getCenter();
+        const groundY = tnCanvas.height * 0.87;
+
+        state.bonziData.forEach((bd, idx) => {
+            const el = bd.element;
+            if (!el) return;
+
+            const dx = bd.origX - center.x;
+            const dy = bd.origY - center.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < CONFIG.TORNADO_RADIUS && el.style.display !== 'none') {
+                bd.isCaught = true;
+
+                const baseAngle = Math.atan2(dy, dx);
+                const orbitAngle = baseAngle + state.angle * (1 + bd.radiusOffset * 0.5);
+                const rFactor = 1 - (dist / CONFIG.TORNADO_RADIUS) * 0.7;
+                const orbitR = 20 + (CONFIG.TORNADO_RADIUS * 0.5) * rFactor * bd.radiusOffset;
+
+                const targetX = center.x + Math.cos(orbitAngle) * orbitR;
+                const liftFactor = 1 - (dist / CONFIG.TORNADO_RADIUS);
+                const lift = Math.sin(now / 1000 + bd.liftOffset) * 30 + liftFactor * CONFIG.LIFT_FORCE * 150;
+                const targetY = groundY - lift - 80 - bd.liftOffset * 0.5;
+
+                el.style.left = (targetX - el.offsetWidth / 2) + 'px';
+                el.style.top = (targetY - el.offsetHeight / 2) + 'px';
+                el.style.transform = `rotate(${state.angle * 3 + idx * 1.2}rad) scale(${1 - liftFactor * 0.3})`;
+                el.style.opacity = 0.85;
+                el.style.zIndex = 999;
+                el.style.filter = `blur(${liftFactor * 1.5}px)`;
+            } else if (bd.isCaught) {
+                bd.isCaught = false;
+                el.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                el.style.left = (bd.origX - el.offsetWidth / 2) + 'px';
+                el.style.top = (bd.origY - el.offsetHeight / 2) + 'px';
+                el.style.transform = 'rotate(0deg) scale(1)';
+                el.style.opacity = bd.origOpacity;
+                el.style.filter = 'none';
+                el.style.zIndex = '';
+                setTimeout(() => { el.style.transition = 'none'; }, 900);
+            }
+        });
+    }
+
+    // --- Главный цикл ---
+    function animate(time) {
+        if (!state.active) {
+            requestAnimationFrame(animate);
+            return;
+        }
+
+        state.time = time;
+        state.angle += CONFIG.ROTATION_SPEED;
+
+        const w = bgCanvas.width;
+        const h = bgCanvas.height;
+
+        // Фоновый слой: небо, облака, земля, дождь, молнии
+        bgCtx.clearRect(0, 0, w, h);
+        drawSky(bgCtx, w, h);
+        drawClouds(bgCtx, w, h, time);
+        drawGround(bgCtx, w, h);
+        drawRain(bgCtx, w, h);
+        drawLightning(bgCtx, w, h, time);
+        drawVignette(bgCtx, w, h);
+
+        // Слой торнадо: воронка + мусор
+        tnCtx.clearRect(0, 0, w, h);
+        drawTornadoFunnel(tnCtx, w, h, time);
+        drawDebris(tnCtx, w, h, time);
+
+        // Bonzi
+        updateBonzis(time);
+
+        requestAnimationFrame(animate);
+    }
+
+    // --- Запуск ---
+    state.lightning.nextTime = performance.now() + 2000 + Math.random() * 3000;
+    animate(performance.now());
+
+    // --- Остановка ---
+    window.stopTornado = function () {
+        state.active = false;
+        state.bonziData.forEach(bd => {
+            bd.element.style.transition = 'all 0.5s ease';
+            bd.element.style.left = (bd.origX - bd.element.offsetWidth / 2) + 'px';
+            bd.element.style.top = (bd.origY - bd.element.offsetHeight / 2) + 'px';
+            bd.element.style.transform = 'rotate(0deg) scale(1)';
+            bd.element.style.opacity = bd.origOpacity;
+            bd.element.style.filter = 'none';
+            bd.element.style.zIndex = '';
+        });
+        bgCanvas.remove();
+        tnCanvas.remove();
+        container.style.boxShadow = 'none';
+        console.log('[Tornado] Stopped.');
+    };
+
+    // --- Перезапуск ---
+    window.startTornado = function () {
+        if (state.active) return;
+        // Повторно вставляем канвасы
+        container.appendChild(bgCanvas);
+        container.appendChild(tnCanvas);
+        resizeCanvases();
+        initClouds();
+        initTrees();
+        initRain();
+        state.active = true;
+        state.lightning.nextTime = performance.now() + 2000;
+        console.log('[Tornado] Restarted.');
+    };
+
+    // Респавн Bonzi
+    setInterval(() => {
+        state.bonziData.forEach(bd => {
+            if (bd.element.style.display === 'none' && !bd.isCaught) {
+                bd.element.style.display = '';
+                bd.element.style.opacity = bd.origOpacity;
+            }
+        });
+    }, CONFIG.RESPAWN_DELAY);
+
+    console.log('[EF2 Tornado System] Initialized — visual funnel, wall cloud, rain, lightning, debris. Wind ~' + CONFIG.WIND_SPEED_MPH + ' mph.');
+})();
