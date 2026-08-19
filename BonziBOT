@@ -1,0 +1,1849 @@
+const prefix = "b!";
+const botname = "BonziBOT Remaster (" + prefix + "help)";
+const version = "0.3 BOSSFIGHT BETA";
+
+let lockcmd = false;
+let botCannotAsshole = true
+
+// ============================================================
+// ADMINS
+// ============================================================
+
+const bossAdmins = [
+    "-Arthurzinhoaoao-",
+    "rad"
+];
+
+// ============================================================
+// HELP
+// ============================================================
+
+var help =
+    "__**Bonzi's Bot Commands**__\n" +
+    "b!help | b!say {TEXT} | b!joke | b!aplle | b!noob | b!llama | b!source | b!parrot | b!cow | b!camel | b!gibberish | b!josephify | b!jzify | b!gokid | b!giko | b!fact | b!freepope | b!backflip | b!asshole\n" +
+    "__**New Commands:**__\n" +
+    "b!8ball {QUESTION} | b!mock {TEXT} | b!reverse {TEXT} | b!hug {USER} | b!slap {USER} | b!bonzi | b!color {COLOR} | b!hat {HAT} | b!reset | b!wtf | b!rainbowname | b!fancyecho {TEXT} | b!zalgo {TEXT} | b!echo {TEXT} | b!say {TEXT} | b!eccho {TEXT} | b!8ball {QUESTION} | b!coinflip | b!rps {rock/paper/scissors}" +
+    "__**⚔️ BOSSFIGHT COMMANDS:**__\n" +
+    "b!bossfight | b!attack | b!heal | b!bossstats";
+    "__ MODE COMMANDS:**__\n" +
+    "b!modenormal | b!modegenz";
+
+// ============================================================
+// NUKE
+// ============================================================
+
+const nukelines = [
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "I JUST DID A BOOM BOOM!",
+    "Goodbye everyone! I'm going to the purple void!",
+    "Weeeeeeeeeeeeeeeeeee",
+    "KaBLAM! There goes myself.",
+    "AAAAAAAAAAAAAAAAAAAAA!"
+];
+
+const otherUserNukes = [
+    "KaBLAM! There goes that bonzi",
+    "KaBOOM! That bonzi did a boom boom!",
+    "[[kabum]]",
+    "[[kabum]]! That bonzi did a [[bum bum]]"
+];
+
+// ============================================================
+// 8 BALL
+// ============================================================
+
+const eightBallResponses = [
+    "It is certain.",
+    "It is decidedly so.",
+    "Without a doubt.",
+    "Yes definitely.",
+    "You may rely on it.",
+    "As I see it, yes.",
+    "Most likely.",
+    "Outlook good.",
+    "Yes.",
+    "Signs point to yes.",
+    "Reply hazy, try again.",
+    "Ask again later.",
+    "Better not tell you now.",
+    "Cannot predict now.",
+    "Concentrate and ask again.",
+    "Don't count on it.",
+    "My reply is no.",
+    "My sources say no.",
+    "Outlook not so good.",
+    "Very doubtful."
+];
+
+// ============================================================
+// BOSS DEFINITIONS
+// ============================================================
+
+const bosses = [
+    {
+        name: "EVIL BONZI",
+        maxHP: 5000,
+        attacks: [
+            { name: "Purple Punch", damageMin: 150, damageMax: 350, effect: "punch", sound: "punch", explode: false },
+            { name: "Banana Barrage", damageMin: 100, damageMax: 500, effect: "banana", sound: "banana", explode: false },
+            { name: "BONZI BLAST", damageMin: 250, damageMax: 650, effect: "blast", sound: "blast", explode: true }
+        ],
+        special: {
+            name: "PURPLE APOCALYPSE",
+            damageMin: 500,
+            damageMax: 1000,
+            effect: "apocalypse",
+            sound: "apocalypse",
+            explode: true
+        }
+    },
+    {
+        name: "MEGA BONZI",
+        maxHP: 8000,
+        attacks: [
+            { name: "Mega Slap", damageMin: 200, damageMax: 450, effect: "mega_slap", sound: "mega_slap", explode: false },
+            { name: "Gorilla Roar", damageMin: 150, damageMax: 550, effect: "roar", sound: "roar", explode: false },
+            { name: "Internet Destroyer", damageMin: 300, damageMax: 700, effect: "glitch", sound: "glitch", explode: true }
+        ],
+        special: {
+            name: "MEGA PURPLE BEAM",
+            damageMin: 600,
+            damageMax: 1200,
+            effect: "beam",
+            sound: "beam",
+            explode: true
+        }
+    },
+    {
+        name: "CORRUPTED BONZI",
+        maxHP: 10000,
+        attacks: [
+            { name: "Corruption", damageMin: 250, damageMax: 500, effect: "corrupt", sound: "corrupt", explode: false },
+            { name: "Glitch Attack", damageMin: 200, damageMax: 650, effect: "glitch", sound: "glitch", explode: false },
+            { name: "Void Smash", damageMin: 350, damageMax: 800, effect: "void", sound: "void", explode: true }
+        ],
+        special: {
+            name: "REALITY CRASH",
+            damageMin: 800,
+            damageMax: 1500,
+            effect: "reality",
+            sound: "reality",
+            explode: true
+        }
+    },
+    {
+        name: "BONZI OVERLORD",
+        maxHP: 15000,
+        attacks: [
+            { name: "Overlord Slam", damageMin: 400, damageMax: 900, effect: "slam", sound: "slam", explode: false },
+            { name: "Purple Lightning", damageMin: 350, damageMax: 1000, effect: "lightning", sound: "lightning", explode: false },
+            { name: "GIGA BANANA", damageMin: 500, damageMax: 1100, effect: "giga_banana", sound: "giga_banana", explode: true }
+        ],
+        special: {
+            name: "THE END OF THE INTERNET",
+            damageMin: 1200,
+            damageMax: 2200,
+            effect: "internet_end",
+            sound: "internet_end",
+            explode: true
+        }
+    }
+];
+
+// ============================================================
+// BOSSFIGHT STATE
+// ============================================================
+
+let bossFight = {
+    active: false,
+    boss: null,
+    bossHP: 0,
+    bossMaxHP: 0,
+    phase: 1,
+    players: {},
+    startedBy: null,
+    attackTimer: null,
+    ending: false
+};
+
+// Users seen in the room.
+// The bot learns names from normal chat/talk traffic.
+// If your BonziWORLD server exposes a dedicated room-user list,
+// replace/extend updateActiveUser() with that list.
+const activeUsers = {};
+
+// ============================================================
+// GENERAL HELPERS
+// ============================================================
+
+function randomNumber(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomItem(array) {
+    return array[Math.floor(Math.random() * array.length)];
+}
+
+function mockText(str) {
+    return str
+        .split("")
+        .map((char, i) =>
+            i % 2 === 0 ? char.toLowerCase() : char.toUpperCase()
+        )
+        .join("");
+}
+
+function getUsername(message) {
+    return (
+        message.name ||
+        message.username ||
+        message.user ||
+        message.userName ||
+        message.nick ||
+        "Unknown User"
+    );
+}
+
+function isBossAdmin(username) {
+    return bossAdmins.includes(username);
+}
+
+function sendMsg(msg) {
+    setTimeout(() => {
+        socket.emit("talk", { text: msg });
+    }, 1100);
+}
+
+function updateActiveUser(username) {
+    if (!username || username === "Unknown User") return;
+
+    activeUsers[username] = {
+        username: username,
+        lastSeen: Date.now()
+    };
+
+    // Anyone who speaks during a bossfight becomes a player.
+    if (bossFight.active) {
+        addBossPlayer(username);
+    }
+}
+
+function cleanupActiveUsers() {
+    const now = Date.now();
+    const timeout = 10 * 60 * 1000;
+
+    Object.keys(activeUsers).forEach(username => {
+        if (now - activeUsers[username].lastSeen > timeout) {
+            delete activeUsers[username];
+        }
+    });
+}
+
+// ============================================================
+// BOSS VFX / SFX
+// ============================================================
+
+function bossVFX(effect, data = {}) {
+    socket.emit("bossfight:vfx", {
+        effect: effect,
+        ...data
+    });
+}
+
+function bossSFX(sound, data = {}) {
+    socket.emit("bossfight:sfx", {
+        sound: sound,
+        ...data
+    });
+}
+
+// ============================================================
+// BOSS HELPERS
+// ============================================================
+
+function bossBroadcast(text) {
+    sendMsg(text);
+}
+
+function addBossPlayer(username) {
+    if (!username || username === "Unknown User") return null;
+
+    if (!bossFight.players[username]) {
+        bossFight.players[username] = {
+            hp: 100,
+            maxHP: 100,
+            heals: 3,
+            lastAttack: 0,
+            lastHeal: 0
+        };
+    }
+
+    return bossFight.players[username];
+}
+
+function bossPlayerCount() {
+    return Object.keys(bossFight.players).length;
+}
+
+function getAlivePlayers() {
+    return Object.keys(bossFight.players).filter(
+        username => bossFight.players[username].hp > 0
+    );
+}
+
+function getRandomAlivePlayer() {
+    const players = getAlivePlayers();
+
+    if (players.length === 0) return null;
+
+    return randomItem(players);
+}
+
+function allPlayersDead() {
+    const players = Object.values(bossFight.players);
+
+    if (players.length === 0) return false;
+
+    return players.every(player => player.hp <= 0);
+}
+
+// ============================================================
+// RANDOM ACTIVE USER TARGETING
+// ============================================================
+
+function getRandomActiveUser() {
+    cleanupActiveUsers();
+
+    const names = Object.keys(activeUsers);
+
+    if (names.length === 0) {
+        return null;
+    }
+
+    return randomItem(names);
+}
+
+function getRandomActiveBossTarget() {
+    // Prefer every currently known active user.
+    const username = getRandomActiveUser();
+
+    if (!username) {
+        return null;
+    }
+
+    addBossPlayer(username);
+    return username;
+}
+
+// ============================================================
+// BOSS PHASE SYSTEM
+// ============================================================
+
+function bossPhaseCheck() {
+    if (!bossFight.active) return;
+
+    const percentage =
+        bossFight.bossHP / bossFight.bossMaxHP;
+
+    let newPhase = 1;
+
+    if (percentage <= 0.75) newPhase = 2;
+    if (percentage <= 0.50) newPhase = 3;
+    if (percentage <= 0.25) newPhase = 4;
+
+    if (newPhase > bossFight.phase) {
+        bossFight.phase = newPhase;
+
+        bossBroadcast(
+            `⚠️ **${bossFight.boss.name} HAS ENTERED PHASE ${newPhase}!**`
+        );
+
+        bossBroadcast(
+            "🔥 The boss is becoming more powerful!"
+        );
+
+        bossVFX("phaseChange", {
+            boss: bossFight.boss.name,
+            phase: newPhase
+        });
+
+        bossSFX("phase_change");
+    }
+}
+
+// ============================================================
+// END BOSSFIGHT
+// ============================================================
+
+function endBossFight(victory) {
+    if (!bossFight.active || bossFight.ending) return;
+
+    bossFight.ending = true;
+
+    if (bossFight.attackTimer) {
+        clearTimeout(bossFight.attackTimer);
+        bossFight.attackTimer = null;
+    }
+
+    if (victory) {
+        bossBroadcast("");
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+        bossBroadcast("🏆 **BOSS DEFEATED!**");
+        bossBroadcast(
+            `💥 **${bossFight.boss.name}** has been destroyed!`
+        );
+        bossBroadcast("🎉 THE BONZIWORLD HAS BEEN SAVED!");
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        bossVFX("bossDeath", {
+            boss: bossFight.boss.name
+        });
+
+        bossSFX("boss_defeat");
+    } else {
+        bossBroadcast("");
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+        bossBroadcast("💀 **BOSSFIGHT LOST!**");
+        bossBroadcast(
+            `👹 **${bossFight.boss.name}** has defeated everyone!`
+        );
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        bossVFX("playersDefeated", {
+            boss: bossFight.boss.name
+        });
+
+        bossSFX("boss_victory");
+    }
+
+    setTimeout(() => {
+        bossFight = {
+            active: false,
+            boss: null,
+            bossHP: 0,
+            bossMaxHP: 0,
+            phase: 1,
+            players: {},
+            startedBy: null,
+            attackTimer: null,
+            ending: false
+        };
+    }, 3000);
+}
+
+// ============================================================
+// BOSS AI
+// ============================================================
+
+function bossTurn() {
+    if (!bossFight.active || bossFight.ending) return;
+
+    // IMPORTANT:
+    // The boss now chooses from active users in the room,
+    // not only people who typed b!attack.
+    const targetName = getRandomActiveBossTarget();
+
+    if (!targetName) {
+        bossBroadcast(
+            "⚠️ The boss tried to attack, but no active users were found."
+        );
+
+        bossFight.attackTimer = setTimeout(bossTurn, 4000);
+        return;
+    }
+
+    const target = bossFight.players[targetName];
+
+    let attack;
+
+    let specialChance = 0.20;
+
+    if (bossFight.phase >= 3) specialChance = 0.30;
+    if (bossFight.phase >= 4) specialChance = 0.40;
+
+    if (Math.random() < specialChance) {
+        attack = bossFight.boss.special;
+    } else {
+        attack = randomItem(bossFight.boss.attacks);
+    }
+
+    let damage = randomNumber(
+        attack.damageMin,
+        attack.damageMax
+    );
+
+    damage = Math.floor(
+        damage * (1 + ((bossFight.phase - 1) * 0.20))
+    );
+
+    // 10% dodge.
+    if (Math.random() < 0.10) {
+        bossBroadcast(
+            `💨 **${targetName} dodged ${attack.name}!**`
+        );
+
+        bossVFX("dodge", {
+            target: targetName,
+            attack: attack.name
+        });
+
+        bossSFX("dodge");
+
+        bossFight.attackTimer = setTimeout(
+            bossTurn,
+            bossFight.phase >= 3 ? 2200 : 3200
+        );
+
+        return;
+    }
+
+    target.hp = Math.max(
+        0,
+        target.hp - damage
+    );
+
+    bossBroadcast(
+        `👹 **${bossFight.boss.name}** used **${attack.name}** on **${targetName}**!`
+    );
+
+    bossBroadcast(
+        `💥 **${damage} damage!**`
+    );
+
+    bossBroadcast(
+        `❤️ ${targetName}: **${target.hp}/${target.maxHP} HP**`
+    );
+
+    bossVFX(attack.effect, {
+        boss: bossFight.boss.name,
+        target: targetName,
+        damage: damage,
+        phase: bossFight.phase
+    });
+
+    bossSFX(attack.sound);
+
+    // ========================================================
+    // ACTUAL BONZI EXPLOSION
+    // ========================================================
+
+    // Explosive attacks trigger the target's existing
+    // client-side explode() method.
+    if (attack.explode) {
+        setTimeout(() => {
+            socket.emit("bossfight:explode", {
+                target: targetName,
+                boss: bossFight.boss.name,
+                attack: attack.name,
+                damage: damage
+            });
+        }, 350);
+    }
+
+    if (target.hp <= 0) {
+        bossBroadcast(
+            `💀 **${targetName} has been defeated!**`
+        );
+
+        bossVFX("playerDeath", {
+            target: targetName
+        });
+
+        bossSFX("player_defeat");
+
+        // Defeat animation is also an explosion.
+        setTimeout(() => {
+            socket.emit("bossfight:explode", {
+                target: targetName,
+                boss: bossFight.boss.name,
+                attack: attack.name,
+                defeated: true
+            });
+        }, 650);
+    }
+
+    // Do NOT end the fight just because a player was defeated.
+    // Other active users can still be targeted.
+    bossFight.attackTimer = setTimeout(
+        bossTurn,
+        bossFight.phase >= 3 ? 2200 : 3200
+    );
+}
+
+// ============================================================
+// STARTUP
+// ============================================================
+
+setTimeout(() => {
+    socket.emit("command", {
+        list: ["name", botname]
+    });
+}, 1000);
+
+setTimeout(() => {
+    socket.emit("command", {
+        list: ["none", botname]
+    });
+}, 2100);
+
+setTimeout(() => {
+    socket.emit("command", {
+        list: ["color", "white tophat"]
+    });
+}, 3200);
+
+setTimeout(() => {
+    sendMsg(
+        "BonziBOT is online. Type " +
+        prefix +
+        "help to see commands."
+    );
+
+    setInterval(() => {
+        sendMsg(
+            "SGD's Bot Is Here, Type s!help For Commands."
+        );
+    }, 60000);
+}, 4300);
+
+// ============================================================
+// NUKE EVENTS
+// ============================================================
+
+socket.on("nuked", () => {
+    sendMsg(randomItem(nukelines));
+});
+
+socket.on("nuke", () => {
+    sendMsg(randomItem(otherUserNukes));
+});
+
+
+// ============================================================
+// EXTRA FUN COMMANDS
+// ============================================================
+
+const wtfMessages = [
+    "sus amogus moment 💀",
+    "POV: Bonzi found the forbidden banana 🍌",
+    "EMOTIONAL DAMAGE 💀",
+    "bro really thought that was gonna work 💀",
+    "bonzi.exe has stopped understanding reality",
+    "when the imposter is sus 😳",
+    "ayo who let Bonzi cook",
+    "skill issue + ratio + banana",
+    "THE WIFI IS HAVING A MOMENT",
+    "2021 called and wants its humor back"
+];
+
+const zalgoChars = [
+    "\u030d", "\u030e", "\u0304", "\u0305", "\u033f",
+    "\u0311", "\u0306", "\u0310", "\u0352", "\u0357",
+    "\u0351", "\u0307", "\u0308", "\u030a", "\u0342",
+    "\u0343", "\u0344", "\u034a", "\u034b", "\u034c",
+    "\u0303", "\u0302", "\u030c", "\u0350", "\u0300",
+    "\u0301", "\u030b", "\u030f", "\u0312", "\u0313"
+];
+
+function makeZalgo(str) {
+    return str.split("").map(char => {
+        if (char === " ") return char;
+
+        let result = char;
+        const count = randomNumber(2, 6);
+
+        for (let i = 0; i < count; i++) {
+            result += randomItem(zalgoChars);
+        }
+
+        return result;
+    }).join("");
+}
+
+function fancyEcho(str) {
+    return "✨ 𝓕𝓪𝓷𝓬𝔂 𝓑𝓸𝓷𝔃𝓲: ✨ " + str + " ✨";
+}
+
+function phoneticEcho(str) {
+    const phonetics = {
+        a: "ah",
+        b: "bee",
+        c: "see",
+        d: "dee",
+        e: "ee",
+        f: "eff",
+        g: "gee",
+        h: "aitch",
+        i: "eye",
+        j: "jay",
+        k: "kay",
+        l: "el",
+        m: "em",
+        n: "en",
+        o: "oh",
+        p: "pee",
+        q: "cue",
+        r: "are",
+        s: "ess",
+        t: "tee",
+        u: "you",
+        v: "vee",
+        w: "double-you",
+        x: "ex",
+        y: "why",
+        z: "zee"
+    };
+
+    return str.split("").map(char => {
+        const lower = char.toLowerCase();
+
+        if (phonetics[lower]) {
+            const word = phonetics[lower];
+
+            return char === char.toUpperCase()
+                ? word.toUpperCase()
+                : word;
+        }
+
+        return char;
+    }).join(" ");
+}
+
+const rainbowColors = [
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple"
+];
+
+function rainbowName() {
+    // BonziWORLD's color command is used repeatedly to create
+    // the rainbow effect while keeping the bot name unchanged.
+    let index = 0;
+
+    const interval = setInterval(() => {
+        if (index >= rainbowColors.length) {
+            clearInterval(interval);
+            return;
+        }
+
+        cmd("color " + rainbowColors[index]);
+        index++;
+    }, 450);
+
+    cmd("name " + botname);
+}
+
+function playRPS(choice) {
+    const normalized = choice.toLowerCase().trim();
+
+    const choices = [
+        "rock",
+        "paper",
+        "scissors"
+    ];
+
+    if (!choices.includes(normalized)) {
+        return "Use: b!rps rock, b!rps paper, or b!rps scissors";
+    }
+
+    const botChoice = randomItem(choices);
+
+    if (normalized === botChoice) {
+        return `✊ You chose **${normalized}**. I chose **${botChoice}**. It's a tie!`;
+    }
+
+    const playerWins =
+        (normalized === "rock" && botChoice === "scissors") ||
+        (normalized === "paper" && botChoice === "rock") ||
+        (normalized === "scissors" && botChoice === "paper");
+
+    if (playerWins) {
+        return `🎮 You chose **${normalized}**. I chose **${botChoice}**. You win!`;
+    }
+
+    return `🎮 You chose **${normalized}**. I chose **${botChoice}**. I win!`;
+}
+
+
+// ============================================================
+// TEXT MODES
+// ============================================================
+
+let botTextMode = "normal";
+
+const genzOpeners = [
+    "bradar",
+    "bradar fr",
+    "bradar nah",
+    "bradar bro",
+    "bradar pls"
+];
+
+const genzReactions = [
+    "😭🙏",
+    "💀",
+    "🔥",
+    "🥀",
+    "🤝",
+    "😭🙏💔",
+    "nahhh 😭",
+    "bro 💀"
+];
+
+function genzReply(text) {
+    return randomItem(genzOpeners) + " " +
+        text + " " +
+        randomItem(genzReactions);
+}
+
+function isDumbQuestion(text) {
+    const lower = text.toLowerCase().trim();
+
+    return (
+        lower === "are you ai" ||
+        lower === "are u ai" ||
+        lower === "are you an ai" ||
+        lower === "u ai" ||
+        lower === "you ai" ||
+        lower.includes("are u an ai")
+    );
+}
+
+function modeAwareReply(text) {
+    if (botTextMode === "genz") {
+        if (isDumbQuestion(text)) {
+            return "bradar delete this😭🙏";
+        }
+
+        return genzReply(text);
+    }
+
+    return text;
+}
+
+// ============================================================
+// MAIN CHAT HANDLER
+// ============================================================
+
+socket.on("talk", (message) => {
+    if (!message || typeof message.text !== "string") {
+        return;
+    }
+
+    const text = message.text;
+    const username = getUsername(message);
+
+    // Remember anyone who is visibly active in chat.
+    updateActiveUser(username);
+
+    // ========================================================
+    // TEXT MODE COMMANDS
+    // ========================================================
+
+    if (text === prefix + "modenormal") {
+        botTextMode = "normal";
+        return sendMsg("Normal mode enabled.");
+    }
+
+    if (text === prefix + "modegenz") {
+        botTextMode = "genz";
+        return sendMsg("bradar modegenz activated 😭🙏🔥");
+    }
+
+
+    // ========================================================
+    // EXTRA FUN COMMANDS
+    // ========================================================
+
+    if (text === prefix + "wtf") {
+        return sendMsg(randomItem(wtfMessages));
+    }
+
+    // Rainbow name.
+    // The requested "$r$" mechanism becomes "b!r!".
+    // "b!rainbowname" is the friendly command that activates it.
+    if (text === prefix + "rainbowname") {
+        rainbowName();
+        return sendMsg("🌈 My name is going RAINBOW!");
+    }
+
+    if (text === prefix + "r!") {
+        rainbowName();
+        return sendMsg("🌈 RAINBOW BONZI!");
+    }
+
+    if (text.startsWith(prefix + "fancyecho")) {
+        const fancyText =
+            text.substring(prefix.length + 9).trim();
+
+        if (!fancyText) {
+            return sendMsg("✨ Give me something fancy to say!");
+        }
+
+        return sendMsg(fancyEcho(fancyText));
+    }
+
+    if (text.startsWith(prefix + "zalgo")) {
+        const zalgoText =
+            text.substring(prefix.length + 5).trim();
+
+        if (!zalgoText) {
+            return sendMsg("👁️ Give me something to corrupt...");
+        }
+
+        return sendMsg(makeZalgo(zalgoText));
+    }
+
+    if (text.startsWith(prefix + "echo")) {
+        const echoText =
+            text.substring(prefix.length + 4).trim();
+
+        if (!echoText) {
+            return sendMsg("What do you want me to say?");
+        }
+
+        return sendMsg(modeAwareReply(echoText));
+    }
+
+    // b!say is an alias for b!echo.
+    if (text.startsWith(prefix + "say")) {
+        const sayText =
+            text.substring(prefix.length + 3).trim();
+
+        if (!sayText) {
+            return sendMsg("What do you want me to say?");
+        }
+
+        return sendMsg(modeAwareReply(sayText));
+    }
+
+    if (text.startsWith(prefix + "eccho")) {
+        const ecchoText =
+            text.substring(prefix.length + 5).trim();
+
+        if (!ecchoText) {
+            return sendMsg("What do you want me to say phonetically?");
+        }
+
+        return sendMsg(phoneticEcho(ecchoText));
+    }
+
+    if (text === prefix + "coinflip") {
+        return sendMsg(
+            Math.random() < 0.5
+                ? "🪙 Heads!"
+                : "🪙 Tails!"
+        );
+    }
+
+    if (text.startsWith(prefix + "rps")) {
+        const rpsChoice =
+            text.substring(prefix.length + 3).trim();
+
+        if (!rpsChoice) {
+            return sendMsg(
+                "🎮 Use b!rps rock, b!rps paper, or b!rps scissors!"
+            );
+        }
+
+        return sendMsg(playRPS(rpsChoice));
+    }
+
+
+    // ========================================================
+    // HELP
+    // ========================================================
+
+    if (text === prefix + "help") {
+        return sendMsg(help);
+    }
+
+    // ========================================================
+    // SAY
+    // ========================================================
+
+
+    // ========================================================
+    // APPLE
+    // ========================================================
+
+    if (text === prefix + "aplle") {
+        return sendMsg("ew, apple.\n yay, aplle");
+    }
+
+    // ========================================================
+    // LLAMA
+    // ========================================================
+
+    if (text === prefix + "llama") {
+        return cmd(
+            "img https://files.catbox.moe/qkbzrk.jpeg"
+        );
+    }
+
+    // ========================================================
+    // JOKE / FACT / BACKFLIP / FREEPOPE
+    // ========================================================
+
+    if (text === prefix + "joke") return cmd("joke");
+    if (text === prefix + "fact") return cmd("fact");
+    if (text === prefix + "backflip") return cmd("backflip");
+    if (text === prefix + "freepope") return cmd("freepope");
+
+    // ========================================================
+    // ASSHOLE
+    // ========================================================
+
+    if (text.startsWith(prefix + "asshole")) {
+        if (botCannotAsshole === true) {
+            sendMsg("disabled")
+        }
+        if (botCannotAsshole === false) {
+            cmd(`asshole ${text.substring(prefix.length + 7)}`);
+        }
+    }
+    
+    // ========================================================
+    // SOURCE
+    // ========================================================
+
+    if (text === prefix + "source") {
+        return sendMsg("-moved to " + prefix + "links");
+    }
+
+    // ========================================================
+    // IMAGES
+    // ========================================================
+
+    if (text === prefix + "parrot") {
+        return cmd(
+            "img https://files.catbox.moe/9xklj5.jpeg"
+        );
+    }
+
+    if (text === prefix + "cow") {
+        return cmd(
+            "image https://files.catbox.moe/91ab4p.jpeg"
+        );
+    }
+
+    if (text === prefix + "giko") {
+        return cmd(
+            "image https://files.catbox.moe/lgg7qh.png"
+        );
+    }
+
+    if (text === prefix + "camel") {
+        return cmd(
+            "image https://files.catbox.moe/yesz9i.png"
+        );
+    }
+
+    if (text === prefix + "noob") {
+        return cmd(
+            "image https://files.catbox.moe/npzky7.webp"
+        );
+    }
+
+    // ========================================================
+    // GIBBERISH
+    // ========================================================
+
+    if (text.startsWith(prefix + "gibberish")) {
+        const gibberishlang = [
+            "[[_^_cmn]]", "[[_^_vi]]", "[[_^_en]]",
+            "[[_^_es]]", "[[_^_fr]]", "[[_^_de]]",
+            "[[_^_it]]", "[[_^_pt]]", "[[_^_ru]]",
+            "[[_^_ja]]", "[[_^_ko]]", "[[_^_zh]]"
+        ];
+
+        const gibberishmessage = [
+            "h@x du da de d3!",
+            "tygtyty@",
+            "@plle p0i",
+            "sal@d@",
+            "Hs @e",
+            "p03 ere mu",
+            "ooer nooer",
+            "i?",
+            "r0RRRR",
+            "b0303er n030303r"
+        ];
+
+        return sendMsg(
+            randomItem(gibberishlang) +
+            " " +
+            randomItem(gibberishmessage)
+        );
+    }
+
+    // ========================================================
+    // JOSEPHIFY
+    // ========================================================
+
+    if (text === prefix + "josephify") {
+        cmd("color yellow");
+        cmd("hat tophat");
+        cmd("name Emperor Joseph");
+
+        return sendMsg("^^**MY EMPERORS!**^^");
+    }
+
+    // ========================================================
+    // JZIFY
+    // ========================================================
+
+    if (text === prefix + "jzify") {
+        cmd("color purple");
+        cmd("hat glitch");
+        cmd("name jzbot " + prefix + "help");
+
+        return sendMsg(
+            "yo, try " +
+            prefix +
+            "help. or " +
+            prefix +
+            "source if you want my boy, bot."
+        );
+    }
+
+    // ========================================================
+    // GOKID
+    // ========================================================
+
+    if (text.startsWith(prefix + "gokid")) {
+        if (lockcmd === true) {
+            return sendMsg("disabled");
+        }
+
+        const userxd =
+            text.substring(prefix.length + 6).trim();
+
+        const gokids = [
+            `${userxd}, your a gokid!`,
+            `Hey, ${userxd}! You're a freaking gokid!`
+        ];
+
+        return sendMsg(randomItem(gokids));
+    }
+
+    // ========================================================
+    // 8 BALL
+    // ========================================================
+
+    if (text.startsWith(prefix + "8ball")) {
+        const question =
+            text.substring(prefix.length + 5).trim();
+
+        if (!question) {
+            return sendMsg(
+                "You need to ask a question!"
+            );
+        }
+
+        return sendMsg(
+            "🎱 " +
+            randomItem(eightBallResponses)
+        );
+    }
+
+    // ========================================================
+    // MOCK
+    // ========================================================
+
+    if (text.startsWith(prefix + "mock")) {
+        const mockTarget =
+            text.substring(prefix.length + 4).trim();
+
+        if (!mockTarget) {
+            return sendMsg(
+                "What do you want me to mock?"
+            );
+        }
+
+        return sendMsg(mockText(mockTarget));
+    }
+
+    // ========================================================
+    // REVERSE
+    // ========================================================
+
+    if (text.startsWith(prefix + "reverse")) {
+        const revText =
+            text.substring(prefix.length + 7).trim();
+
+        if (!revText) {
+            return sendMsg(
+                "Provide text to reverse!"
+            );
+        }
+
+        return sendMsg(
+            revText.split("").reverse().join("")
+        );
+    }
+
+    // ========================================================
+    // HUG
+    // ========================================================
+
+    if (text.startsWith(prefix + "hug")) {
+        const hugTarget =
+            text.substring(prefix.length + 3).trim();
+
+        if (!hugTarget) {
+            return sendMsg(
+                "Who do you want me to hug?"
+            );
+        }
+
+        return sendMsg(
+            `*gives ${hugTarget} a big, warm purple gorilla hug*`
+        );
+    }
+
+    // ========================================================
+    // SLAP
+    // ========================================================
+
+    if (text.startsWith(prefix + "slap")) {
+        const slapTarget =
+            text.substring(prefix.length + 4).trim();
+
+        if (!slapTarget) {
+            return sendMsg(
+                "Who do you want me to slap?"
+            );
+        }
+
+        const slapResponses = [
+            `*slaps ${slapTarget} with a giant banana*`,
+            `*slaps ${slapTarget} across the room*`,
+            `*violently slaps ${slapTarget} with a keyboard*`
+        ];
+
+        return sendMsg(randomItem(slapResponses));
+    }
+
+    // ========================================================
+    // BONZI
+    // ========================================================
+
+    if (text === prefix + "bonzi") {
+        return sendMsg(
+            "Hehehehe! BonziBUDDY is here to help you browse the internet! Would you like to install a free cursor?"
+        );
+    }
+
+    // ========================================================
+    // COLOR
+    // ========================================================
+
+    if (text.startsWith(prefix + "color")) {
+        const newColor =
+            text.substring(prefix.length + 5)
+                .trim()
+                .toLowerCase();
+
+        if (!newColor) {
+            return sendMsg(
+                "What color should I become?"
+            );
+        }
+
+        cmd("color " + newColor);
+
+        return sendMsg(
+            `Poof! I am now ${newColor}.`
+        );
+    }
+
+    // ========================================================
+    // HAT
+    // ========================================================
+
+    if (text.startsWith(prefix + "hat")) {
+        const newHat =
+            text.substring(prefix.length + 3)
+                .trim()
+                .toLowerCase();
+
+        if (!newHat) {
+            return sendMsg(
+                "What hat should I wear?"
+            );
+        }
+
+        cmd("hat " + newHat);
+
+        return sendMsg(
+            `Putting on my ${newHat}!`
+        );
+    }
+
+    // ========================================================
+    // RESET
+    // ========================================================
+
+    if (text === prefix + "reset") {
+        cmd("color white");
+        cmd("hat tophat");
+        cmd("name " + botname);
+
+        return sendMsg(
+            "Reset back to default BonziBOT!"
+        );
+    }
+
+    // ========================================================
+    // ⚔️ BOSSFIGHT START
+    // ========================================================
+
+    if (text === prefix + "bossfight") {
+        if (!isBossAdmin(username)) {
+            return sendMsg(
+                "You need to be an admin to start a bossfight!"
+            );
+        }
+
+        if (bossFight.active) {
+            return sendMsg(
+                `⚠️ A bossfight is already happening against ${bossFight.boss.name}!`
+            );
+        }
+
+        const selectedBoss =
+            randomItem(bosses);
+
+        bossFight = {
+            active: true,
+            boss: selectedBoss,
+            bossHP: selectedBoss.maxHP,
+            bossMaxHP: selectedBoss.maxHP,
+            phase: 1,
+            players: {},
+            startedBy: username,
+            attackTimer: null,
+            ending: false
+        };
+
+        // Add the admin and every user known to be active.
+        Object.keys(activeUsers).forEach(name => {
+            addBossPlayer(name);
+        });
+
+        addBossPlayer(username);
+
+        bossVFX("bossIntro", {
+            boss: selectedBoss.name,
+            hp: selectedBoss.maxHP
+        });
+
+        bossSFX("boss_intro");
+
+        bossBroadcast("");
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+        bossBroadcast("⚠️⚠️⚠️ **WARNING** ⚠️⚠️⚠️");
+        bossBroadcast("");
+        bossBroadcast("👹 **A BOSS HAS APPEARED!**");
+        bossBroadcast("");
+        bossBroadcast(
+            `🔥 **${selectedBoss.name}**`
+        );
+        bossBroadcast(
+            `❤️ HP: **${selectedBoss.maxHP}**`
+        );
+        bossBroadcast(
+            `👑 Started by admin **${username}**`
+        );
+        bossBroadcast("");
+        bossBroadcast(
+            "🎯 **The boss randomly attacks active users!**"
+        );
+        bossBroadcast(
+            "💥 **Explosive attacks trigger their Bonzi's explode() animation!**"
+        );
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        setTimeout(() => {
+            if (!bossFight.active) return;
+
+            bossBroadcast(
+                `⚔️ Type **${prefix}attack** to attack!`
+            );
+
+            bossBroadcast(
+                `💚 Type **${prefix}heal** to heal yourself!`
+            );
+
+            bossBroadcast(
+                `📊 Type **${prefix}bossstats** for stats!`
+            );
+        }, 1800);
+
+        bossFight.attackTimer =
+            setTimeout(bossTurn, 8000);
+
+        return;
+    }
+
+    // ========================================================
+    // ⚔️ ATTACK
+    // ========================================================
+
+    if (text === prefix + "attack") {
+        if (!bossFight.active) {
+            return sendMsg(
+                "There is no bossfight happening right now."
+            );
+        }
+
+        const player =
+            addBossPlayer(username);
+
+        if (player.hp <= 0) {
+            return sendMsg(
+                `💀 ${username}, you're defeated and cannot attack!`
+            );
+        }
+
+        const now = Date.now();
+
+        if (now - player.lastAttack < 1000) {
+            return sendMsg(
+                "⏳ You're attacking too quickly!"
+            );
+        }
+
+        player.lastAttack = now;
+
+        let damage =
+            randomNumber(200, 500);
+
+        let critical = false;
+
+        if (Math.random() < 0.15) {
+            critical = true;
+            damage *= 2;
+        }
+
+        if (Math.random() < 0.08) {
+            bossBroadcast(
+                `💨 **${username}** attacked **${bossFight.boss.name}** but MISSED!`
+            );
+
+            bossVFX("playerMiss", {
+                player: username
+            });
+
+            bossSFX("miss");
+
+            return;
+        }
+
+        bossFight.bossHP =
+            Math.max(
+                0,
+                bossFight.bossHP - damage
+            );
+
+        if (critical) {
+            bossBroadcast(
+                `💥 **CRITICAL HIT!** **${username}** dealt **${damage} damage!**`
+            );
+
+            bossVFX("criticalHit", {
+                player: username,
+                boss: bossFight.boss.name,
+                damage: damage
+            });
+
+            bossSFX("critical");
+        } else {
+            bossBroadcast(
+                `⚔️ **${username}** attacked **${bossFight.boss.name}** for **${damage} damage!**`
+            );
+
+            bossVFX("playerAttack", {
+                player: username,
+                boss: bossFight.boss.name,
+                damage: damage
+            });
+
+            bossSFX("attack");
+        }
+
+        bossBroadcast(
+            `👹 ${bossFight.boss.name}: **${bossFight.bossHP}/${bossFight.bossMaxHP} HP**`
+        );
+
+        bossPhaseCheck();
+
+        if (bossFight.bossHP <= 0) {
+            setTimeout(() => {
+                endBossFight(true);
+            }, 1200);
+
+            return;
+        }
+
+        return;
+    }
+
+    // ========================================================
+    // 💚 HEAL
+    // ========================================================
+
+    if (text === prefix + "heal") {
+        if (!bossFight.active) {
+            return sendMsg(
+                "There is no bossfight happening right now."
+            );
+        }
+
+        const player =
+            addBossPlayer(username);
+
+        if (player.hp <= 0) {
+            return sendMsg(
+                `💀 ${username}, you're defeated!`
+            );
+        }
+
+        if (player.heals <= 0) {
+            return sendMsg(
+                `❌ ${username}, you have no heals left!`
+            );
+        }
+
+        const now = Date.now();
+
+        if (now - player.lastHeal < 5000) {
+            return sendMsg(
+                "⏳ Your heal is on cooldown!"
+            );
+        }
+
+        player.lastHeal = now;
+        player.heals--;
+
+        const healAmount =
+            randomNumber(20, 45);
+
+        const oldHP =
+            player.hp;
+
+        player.hp =
+            Math.min(
+                player.maxHP,
+                player.hp + healAmount
+            );
+
+        const actualHeal =
+            player.hp - oldHP;
+
+        bossBroadcast(
+            `💚 **${username}** healed for **${actualHeal} HP!**`
+        );
+
+        bossBroadcast(
+            `❤️ ${username}: **${player.hp}/${player.maxHP} HP**`
+        );
+
+        bossVFX("heal", {
+            player: username,
+            amount: actualHeal
+        });
+
+        bossSFX("heal");
+
+        return;
+    }
+
+    // ========================================================
+    // 📊 BOSS STATS
+    // ========================================================
+
+    if (text === prefix + "bossstats") {
+        if (!bossFight.active) {
+            return sendMsg(
+                "There is no bossfight happening right now."
+            );
+        }
+
+        const player =
+            addBossPlayer(username);
+
+        const percentage =
+            Math.floor(
+                (bossFight.bossHP /
+                    bossFight.bossMaxHP) *
+                100
+            );
+
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        bossBroadcast(
+            `👹 **${bossFight.boss.name}**`
+        );
+
+        bossBroadcast(
+            `❤️ Boss HP: **${bossFight.bossHP}/${bossFight.bossMaxHP} (${percentage}%)**`
+        );
+
+        bossBroadcast(
+            `🔥 Phase: **${bossFight.phase}**`
+        );
+
+        bossBroadcast(
+            `👥 Players: **${bossPlayerCount()}**`
+        );
+
+        bossBroadcast(
+            `🎯 Active users tracked: **${Object.keys(activeUsers).length}**`
+        );
+
+        bossBroadcast(
+            `❤️ Your HP: **${player.hp}/${player.maxHP}**`
+        );
+
+        bossBroadcast(
+            `💚 Heals: **${player.heals}**`
+        );
+
+        bossBroadcast("━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        return;
+    }
+});
+
+// ============================================================
+// CLIENT BOSS VFX
+// ============================================================
+
+socket.on("bossfight:vfx", function(data) {
+    console.log("[Bossfight VFX]", data);
+
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(
+            new CustomEvent(
+                "bonziBossVFX",
+                { detail: data }
+            )
+        );
+    }
+});
+
+// ============================================================
+// CLIENT BOSS SFX
+// ============================================================
+
+socket.on("bossfight:sfx", function(data) {
+    console.log("[Bossfight SFX]", data);
+
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(
+            new CustomEvent(
+                "bonziBossSFX",
+                { detail: data }
+            )
+        );
+    }
+});
+
+// ============================================================
+// CLIENT: TARGETED BONZI EXPLOSION
+// ============================================================
+//
+// This uses the EXISTING explode() method.
+//
+// It supports:
+//   1. bonzis array
+//   2. bonzis object
+//   3. users array
+//   4. users object
+//
+// Adjust the lookup section if your BonziWORLD client uses
+// another collection name.
+//
+
+socket.on("bossfight:explode", function(data) {
+    if (!data || !data.target) {
+        return;
+    }
+
+    console.log(
+        "[Bossfight] EXPLOSION TARGET:",
+        data.target,
+        data
+    );
+
+    let target = null;
+
+    // --------------------------------------------------------
+    // Find target in bonzis[]
+    // --------------------------------------------------------
+
+    if (
+        typeof bonzis !== "undefined" &&
+        Array.isArray(bonzis)
+    ) {
+        target = bonzis.find(bonzi => {
+            return (
+                bonzi &&
+                (
+                    bonzi.name === data.target ||
+                    bonzi.username === data.target ||
+                    bonzi.nick === data.target ||
+                    bonzi.user === data.target
+                )
+            );
+        });
+    }
+
+    // --------------------------------------------------------
+    // Find target in bonzis{}
+    // --------------------------------------------------------
+
+    if (
+        !target &&
+        typeof bonzis !== "undefined" &&
+        bonzis &&
+        typeof bonzis === "object" &&
+        !Array.isArray(bonzis)
+    ) {
+        target =
+            bonzis[data.target] ||
+            Object.values(bonzis).find(bonzi => {
+                return (
+                    bonzi &&
+                    (
+                        bonzi.name === data.target ||
+                        bonzi.username === data.target ||
+                        bonzi.nick === data.target ||
+                        bonzi.user === data.target
+                    )
+                );
+            });
+    }
+
+    // --------------------------------------------------------
+    // Optional users[] fallback
+    // --------------------------------------------------------
+
+    if (
+        !target &&
+        typeof users !== "undefined" &&
+        Array.isArray(users)
+    ) {
+        target = users.find(user => {
+            return (
+                user &&
+                (
+                    user.name === data.target ||
+                    user.username === data.target ||
+                    user.nick === data.target ||
+                    user.user === data.target
+                )
+            );
+        });
+    }
+
+    // --------------------------------------------------------
+    // Optional users{} fallback
+    // --------------------------------------------------------
+
+    if (
+        !target &&
+        typeof users !== "undefined" &&
+        users &&
+        typeof users === "object" &&
+        !Array.isArray(users)
+    ) {
+        target =
+            users[data.target] ||
+            Object.values(users).find(user => {
+                return (
+                    user &&
+                    (
+                        user.name === data.target ||
+                        user.username === data.target ||
+                        user.nick === data.target ||
+                        user.user === data.target
+                    )
+                );
+            });
+    }
+
+    if (!target) {
+        console.warn(
+            "[Bossfight] Could not find Bonzi:",
+            data.target
+        );
+        return;
+    }
+
+    // --------------------------------------------------------
+    // CALL THE EXISTING explode() METHOD
+    // --------------------------------------------------------
+
+    if (typeof target.explode === "function") {
+        target.explode();
+        return;
+    }
+
+    console.warn(
+        "[Bossfight] Target exists but has no explode():",
+        data.target
+    );
+});
+
+// ============================================================
+// OPTIONAL DIRECT EXPLOSION HELPER
+// ============================================================
+//
+// If this code is inside the same file as your Bonzi class,
+// the existing method should look like this:
+//
+// explode() {
+//     let explosion = document.createElement("div");
+//     explosion.className = "explosion";
+//     explosion.style.left = this.x + "px";
+//     explosion.style.top = this.y + "px";
+//     document.body.appendChild(explosion);
+//     this.element.style.zIndex = "999999";
+//
+//     let sfx = new Audio("./explosion.mp3");
+//     sfx.play();
+//
+//     let rot = 0;
+//     let x = 0;
+//     let y = 0;
+//     let angvel = Math.random() * 30 + 20;
+//     if (Math.random() > 0.5) angvel *= -1;
+//
+//     let xvel = Math.random() * 10 + 5;
+//     if (Math.random() > 0.5) xvel *= -1;
+//
+//     let yvel = -20;
+//     let i = 0;
+//
+//     let interval = setInterval(() => {
+//         i++;
+//         yvel += 2;
+//         x += xvel;
+//         rot += angvel;
+//         y += yvel;
+//
+//         this.element.style.transform =
+//             `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+//
+//         if (i > 120) {
+//             clearInterval(interval);
+//             explosion.remove();
+//         }
+//     }, 33);
+// }
