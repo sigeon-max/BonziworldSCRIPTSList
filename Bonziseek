@@ -1,0 +1,315 @@
+// ============================================================
+// BONZISEEK — BonziWORLD AI Assistant
+// ============================================================
+
+const prefix = "b!";
+const botname = "BonziSeek (" + prefix + "help)";
+const version = "1.0.1";
+const update = "27/09/2026";
+
+let uses = 0;
+let lockcmd = false;
+
+// ============================================================
+// OPENROUTER
+// ============================================================
+//
+// IMPORTANT:
+// Do NOT expose your OpenRouter API key in production client-side
+// code. The key you previously pasted should be rotated.
+// Replace this with a new key only if this script runs privately.
+//
+// ============================================================
+
+const OPENROUTER_API_KEY = "NOPE!";
+
+const OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+// ============================================================
+// HELP
+// ============================================================
+
+const help =
+    "__**Bonzi's Seek Commands**__\n" +
+    "b!help | b!ask {TEXT} | b!joke | b!fact | b!backflip";
+
+// ============================================================
+// UTILITY
+// ============================================================
+
+function randomItem(array) {
+    return array[Math.floor(Math.random() * array.length)];
+}
+
+function sendMsg(msg) {
+    setTimeout(() => {
+        socket.emit("talk", {
+            text: String(msg)
+        });
+    }, 1100);
+}
+
+// ============================================================
+// NUKE
+// ============================================================
+
+const nukelines = [
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "I JUST DID A BOOM BOOM!",
+    "Goodbye everyone! I'm going to the purple void!",
+    "Weeeeeeeeeeeeeeeeeee",
+    "KaBLAM! There goes myself.",
+    "AAAAAAAAAAAAAAAAAAAAA!"
+];
+
+const otherUserNukes = [
+    "KaBLAM! There goes that bonzi",
+    "KaBOOM! That bonzi did a boom boom!",
+    "[[kabum]]",
+    "[[kabum]]! That bonzi did a [[bum bum]]"
+];
+
+// ============================================================
+// NUKE EVENTS
+// ============================================================
+
+socket.on("nuked", () => {
+    sendMsg(randomItem(nukelines));
+});
+
+socket.on("nuke", () => {
+    sendMsg(randomItem(otherUserNukes));
+});
+
+// ============================================================
+// BONZISEEK AI
+// ============================================================
+
+async function queryBonziSeek(inputText) {
+
+    try {
+
+        const response = await fetch(OPENROUTER_URL, {
+            method: "POST",
+
+            headers: {
+                "Authorization": "Bearer " + OPENROUTER_API_KEY,
+                "Content-Type": "application/json",
+
+                "HTTP-Referer":
+                    window.location.origin,
+
+                "X-Title":
+                    "BonziSeek"
+            },
+
+            body: JSON.stringify({
+
+                model: OPENROUTER_MODEL,
+
+                messages: [
+                    {
+                        role: "system",
+
+                        content:
+                            "You are BonziSeek, an AI assistant inside BonziWORLD. " +
+                            "Be helpful, friendly, concise and occasionally playful. " +
+                            "Your name is BonziSeek. " +
+                            "Do not claim to be the original BonziBuddy. " +
+                            "Answer the user's question directly."
+                    },
+
+                    {
+                        role: "user",
+                        content: inputText
+                    }
+                ],
+
+                temperature: 0.8,
+
+                max_tokens: 1200
+
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            console.error(
+                "BonziSeek/OpenRouter error:",
+                data
+            );
+
+            return (
+                "BonziSeek error: " +
+                (
+                    data?.error?.message ||
+                    "OpenRouter request failed."
+                )
+            );
+        }
+
+        const result =
+            data?.choices?.[0]?.message?.content;
+
+        if (!result) {
+            return "BonziSeek couldn't generate a response.";
+        }
+
+        return result.trim();
+
+    } catch (error) {
+
+        console.error(
+            "BonziSeek connection error:",
+            error
+        );
+
+        return (
+            "BonziSeek couldn't connect to OpenRouter."
+        );
+    }
+}
+
+// ============================================================
+// REGISTER BOT NAME
+// ============================================================
+
+setTimeout(() => {
+
+    socket.emit("command", {
+        list: [
+            "name",
+            botname
+        ]
+    });
+
+}, 1000);
+
+// ============================================================
+// ONLINE MESSAGE
+// ============================================================
+
+setTimeout(() => {
+
+    sendMsg(
+        "BonziSeek is online. Type " +
+        prefix +
+        "help to see commands."
+    );
+
+}, 2000);
+
+// ============================================================
+// COMMAND HANDLER
+// ============================================================
+
+socket.on("talk", async (message) => {
+
+    if (!message || typeof message.text !== "string") {
+        return;
+    }
+
+    const text = message.text.trim();
+
+    // ========================================================
+    // LOCK
+    // ========================================================
+
+    if (lockcmd) {
+        return;
+    }
+
+    // ========================================================
+    // HELP
+    // ========================================================
+
+    if (text === prefix + "help") {
+
+        return sendMsg(help);
+    }
+
+    // ========================================================
+    // JOKE / FACT / BACKFLIP
+    // ========================================================
+
+    if (text === prefix + "joke") {
+
+        if (typeof cmd === "function") {
+            return cmd("joke");
+        }
+
+        return sendMsg(
+            "Why did the Bonzi cross the desktop? " +
+            "To get to the other window!"
+        );
+    }
+
+    if (text === prefix + "fact") {
+
+        if (typeof cmd === "function") {
+            return cmd("fact");
+        }
+
+        return sendMsg(
+            "BonziSeek uses DeepSeek through OpenRouter."
+        );
+    }
+
+    if (text === prefix + "backflip") {
+
+        if (typeof cmd === "function") {
+            return cmd("backflip");
+        }
+
+        return sendMsg(
+            "*BonziSeek does a spectacular backflip*"
+        );
+    }
+
+    // ========================================================
+    // ASK
+    // ========================================================
+
+    if (text.startsWith(prefix + "ask")) {
+
+        const userQuery =
+            text
+                .substring(
+                    (prefix + "ask").length
+                )
+                .trim();
+
+        if (!userQuery) {
+
+            return sendMsg(
+                "Please provide a question or prompt after '" +
+                prefix +
+                "ask'."
+            );
+        }
+
+        // Processing message
+        sendMsg(
+            "- Processing your query..."
+        );
+
+        const aiResponse =
+            await queryBonziSeek(userQuery);
+
+        sendMsg(
+            "**BonziSeek:** " +
+            aiResponse
+        );
+
+        uses++;
+
+        return;
+    }
+});
+
+// ============================================================
+// END BONZISEEK
+// ============================================================
